@@ -3,6 +3,7 @@ package org.nuxeo.vertx.zip;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.NoSuchElementException;
 
 import com.thedeanda.lorem.Lorem;
 import com.thedeanda.lorem.LoremIpsum;
@@ -35,7 +36,11 @@ public class RandomFileIterator implements FileEntryIterator {
 
     @Override
     public FileEntry next() {
-        return new TemplatedFileEntry(index++, engine);
+        if (hasNext()) {
+            return new TemplatedFileEntry(index++, engine);
+        } else {
+            throw new NoSuchElementException();
+        }
     }
 
     public static class TemplatedFileEntry implements FileEntry {

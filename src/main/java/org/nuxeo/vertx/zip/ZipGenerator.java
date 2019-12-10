@@ -1,3 +1,11 @@
+/*
+ * (C) Copyright 2019 Nuxeo (http://nuxeo.com/).
+ * This is unpublished proprietary source code of Nuxeo SA. All rights reserved.
+ * Notice of copyright on this source code does not indicate publication.
+ *
+ * Contributors:
+ *     dmetzler
+ */
 package org.nuxeo.vertx.zip;
 
 import java.io.IOException;
@@ -18,12 +26,8 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.streams.ReadStream;
 
 /**
- * This class is a {@link ReadStream<Buffer>} that can be used to generate a
- * list of file compressed in a ZIP stream.
- *
- * Typical use is:
- *
- * <code>
+ * This class is a {@link ReadStream<Buffer>} that can be used to generate a list of file compressed in a ZIP stream.
+ * Typical use is: <code>
  * ZipGenerator zip = new ZipGenerator(vertx, engine, size);
  * zip.endHandler(v -> {
  *			response.putHeader(HttpHeaders.CONTENT_TYPE, "application/zip, application/octet-stream")
@@ -39,7 +43,6 @@ import io.vertx.core.streams.ReadStream;
  * </code>
  *
  * @author dmetzler
- *
  */
 public class ZipGenerator implements ReadStream<Buffer> {
 
@@ -95,9 +98,9 @@ public class ZipGenerator implements ReadStream<Buffer> {
     /**
      * Creates a generator of ZIP files.
      *
-     * @param vertx  a vertx instance
+     * @param vertx a vertx instance
      * @param engine the templating engine
-     * @param size   the number of file to include in the ZIP
+     * @param size the number of file to include in the ZIP
      * @throws IOException
      */
     public ZipGenerator(Vertx vertx, FileEntryIterator source) throws IOException {
@@ -131,9 +134,8 @@ public class ZipGenerator implements ReadStream<Buffer> {
     }
 
     /**
-     * Reads the next file if available and pass it to the doReadBuffer at next
-     * tick. If no more file is available, we close and stop the generator at next
-     * tick.
+     * Reads the next file if available and pass it to the doReadBuffer at next tick. If no more file is available, we
+     * close and stop the generator at next tick.
      */
     private void doReadFile() {
         if (hasNextFile()) {
@@ -153,6 +155,7 @@ public class ZipGenerator implements ReadStream<Buffer> {
     private void doCloseAndStop() {
         vertx.executeBlocking(v -> {
             try {
+                doFlushPipe();
                 zos.close();
                 v.complete();
             } catch (IOException e) {
@@ -183,10 +186,9 @@ public class ZipGenerator implements ReadStream<Buffer> {
     }
 
     /**
-     * Read the InputStream recursively and notifies the handler when finished
-     * success.
+     * Read the InputStream recursively and notifies the handler when finished success.
      *
-     * @param entry   The entry to read
+     * @param entry The entry to read
      * @param handler
      * @throws IOException
      */
@@ -216,10 +218,10 @@ public class ZipGenerator implements ReadStream<Buffer> {
     }
 
     /**
-     * Open an InputStream for the given file entry and call
-     * {@link ZipGenerator#readFile(FileEntry, Handler)} on Success.
+     * Open an InputStream for the given file entry and call {@link ZipGenerator#readFile(FileEntry, Handler)} on
+     * Success.
      *
-     * @param entry   the file entry
+     * @param entry the file entry
      * @param handler the handler that is passed to readFile
      * @throws IOException
      */
@@ -242,21 +244,30 @@ public class ZipGenerator implements ReadStream<Buffer> {
 
     private void doFlushPipe() {
         acquireContext();
-        if (this.state == STATUS_ACTIVE) {
-            try {
-                // Read all possible data from the pipe
-                byte[] tmp = new byte[pis.available()];
-                int readBytes = pis.read(tmp);
-                if (readBytes > 0) {
-                    byte[] buffer = new byte[readBytes];
-                    System.arraycopy(tmp, 0, buffer, 0, readBytes);
-                    dataHandler.handle(Buffer.buffer(buffer));
-                }
-                next(this::doFlushPipe);
+        try {
+            if (this.state == STATUS_ACTIVE) {
+                if (pis.available() > 0) {
+                    // Read all possible data from the pipe
+                    byte[] tmp = new byte[pis.available()];
+                    int readBytes = pis.read(tmp);
+                    if (readBytes > 0) {
+                        byte[] buffer = new byte[readBytes];
+                        System.arraycopy(tmp, 0, buffer, 0, readBytes);
+                        dataHandler.handle(Buffer.buffer(buffer));
+                    }
+                    next(this::doFlushPipe);
 
-            } catch (IOException e) {
-                handleError(e);
+                } else {
+                    // If there is nothing to read, wait a bit until next flush.
+                    Thread.sleep(100);
+                    next(this::doFlushPipe);
+                }
             }
+        } catch (IOException e) {
+            handleError(e);
+        } catch (InterruptedException e) {
+            handleError(e);
+            Thread.currentThread().interrupt();
         }
 
     }
