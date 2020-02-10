@@ -199,12 +199,12 @@ public class ZipGenerator implements ReadStream<Buffer> {
 
         Buffer buf = Buffer.buffer();
         while ((c = fileEntryIS.read()) != -1 && bytesRead < CHUNK_SIZE) {
-            buf.appendInt(c);
+            buf.appendByte((byte) c);
             bytesRead++;
         }
         // Here it can block because the pipe may be full (hence wrapping in
         // executeBlocking)
-        zos.write(buf.getBytes());
+        zos.write(buf.getBytes(0, bytesRead));
 
         if (bytesRead == CHUNK_SIZE) {
             // We are not finished so recurse
@@ -259,15 +259,11 @@ public class ZipGenerator implements ReadStream<Buffer> {
 
                 } else {
                     // If there is nothing to read, wait a bit until next flush.
-                    Thread.sleep(100);
                     next(this::doFlushPipe);
                 }
             }
         } catch (IOException e) {
             handleError(e);
-        } catch (InterruptedException e) {
-            handleError(e);
-            Thread.currentThread().interrupt();
         }
 
     }
